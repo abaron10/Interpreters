@@ -8,7 +8,6 @@ from typing import (
     NamedTuple,
 )
 
-
 @unique
 class TokenType(Enum):
     ASSIGN = auto()
