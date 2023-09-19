@@ -1,0 +1,15 @@
+
+
+
+Parsing function order:
+    1. _parse_statement: 
+    Tiene tres
+    
+    
+    
+    Valida que el primer token sea un  'variable'm si es asi, lo envia al metodo _parse_let_statement 
+    2. _parse_let_statement: acá se crea una instancia de LetStatement debido a que paso la validación de arriba. Luego se
+    valida el token siguiente al actual (variable). El siguiente deberia corresponder a un IDENT (nombre de la variable), si
+    cumple con esta regla de asiganción, se avanzan los tokens +1. Luego de este movimiento, el current token corresponde con 
+    el nombre de la variable, se crea una instancia de Identifier para asignar el nombre del let_statement. Luego se valida nuevamente
+    con el _expected_token que el siguiente caracter sea de asignación.

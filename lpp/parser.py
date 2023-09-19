@@ -1,32 +1,44 @@
-
+from enum import IntEnum
 from typing import (
     Callable,
     Dict,
+    List,
     Optional,
-    List
-    )
+)
 
 from lpp.ast import (
     Expression,
-    Program,
-    Statement,
+    ExpressionStatement,
+    Identifier,
     LetStatement,
+    Program,
     ReturnStatement,
-    Identifier
+    Statement,
 )
 from lpp.lexer import Lexer
 from lpp.token import (
     Token,
-    TokenType
+    TokenType,
 )
 
-PrefixParsFn = Callable[[], Optional[Expression]] # def sth(): return expression
+PrefixParseFn = Callable[[], Optional[Expression]]
 InfixParseFn = Callable[[Expression], Optional[Expression]]
-PrefixParseFns = Dict[TokenType, PrefixParsFn]
+PrefixParseFns = Dict[TokenType, PrefixParseFn]
 InfixParseFns = Dict[TokenType, InfixParseFn]
 
+
+class Precedence(IntEnum):
+    LOWEST = 1
+    EQUALS = 2
+    LESSGREATER = 3
+    SUM = 4
+    PRODUCT = 5
+    PREFIX = 6
+    CALL = 7
+
+
 class Parser:
-    
+
     def __init__(self, lexer: Lexer) -> None:
         self._lexer = lexer
         self._current_token: Optional[Token] = None
@@ -47,20 +59,19 @@ class Parser:
         program: Program = Program(statements=[])
 
         assert self._current_token is not None
-        # while there are tokens left, we can process an statement
         while self._current_token.token_type != TokenType.EOF:
             statement = self._parse_statement()
             if statement is not None:
                 program.statements.append(statement)
 
             self._advance_tokens()
+
         return program
 
     def _advance_tokens(self) -> None:
         self._current_token = self._peek_token
         self._peek_token = self._lexer.next_token()
 
-    #this method helps to verify that after a LET statement, there is a IDENT; variable x where x should be the ident
     def _expected_token(self, token_type: TokenType) -> bool:
         assert self._peek_token is not None
         if self._peek_token.token_type == token_type:
@@ -73,26 +84,56 @@ class Parser:
 
     def _expected_token_error(self, token_type: TokenType) -> None:
         assert self._peek_token is not None
-        error = f'Se esperaba que el siguiente token fuera {token_type} pero se obtuvo {self._peek_token.token_type}' 
-        self.errors.append(error)
+        error = f'Se esperaba que el siguiente tokne fuera {token_type} ' + \
+            f'pero se obtuvo {self._peek_token.token_type}'
 
-    # this code verifies that assignation is correct  for LET 
+        self._errors.append(error)
+
+    def _parse_expression(self, precedence: Precedence) -> Optional[Expression]:
+        assert self._current_token is not None
+        try:
+            prefix_parse_fn = self._prefix_parse_fns[self._current_token.token_type]
+        except KeyError:
+            return None
+
+        left_expression = prefix_parse_fn()
+
+        return left_expression
+
+    def _parse_expression_statement(self) -> Optional[ExpressionStatement]:
+        assert self._current_token is not None
+        expression_statement = ExpressionStatement(token=self._current_token)
+
+        expression_statement.expression = self._parse_expression(Precedence.LOWEST)
+
+        assert self._peek_token is not None
+        if self._peek_token.token_type == TokenType.SEMICOLON:
+            self._advance_tokens()
+
+        return expression_statement
+
+    def _parse_identifier(self) -> Identifier:
+        assert self._current_token is not None
+
+        return Identifier(token=self._current_token,
+                          value=self._current_token.literal)
+
     def _parse_let_statement(self) -> Optional[LetStatement]:
         assert self._current_token is not None
         let_statement = LetStatement(token=self._current_token)
 
         if not self._expected_token(TokenType.IDENT):
             return None
-        # if code reached this line, means that validation for asignation is correct so id can now process the name of the variable
-        let_statement.name =  Identifier(token=self._current_token, value=self._current_token.literal)
+
+        let_statement.name = self._parse_identifier() 
 
         if not self._expected_token(TokenType.ASSIGN):
             return None
-        
-        #TODO terminar cuando sepamos parsear expresiones
+
+        # TODO terminar cuando sepamos parsear expresiones
         while self._current_token.token_type != TokenType.SEMICOLON:
             self._advance_tokens()
-        
+
         return let_statement
 
     def _parse_return_statement(self) -> Optional[ReturnStatement]:
@@ -107,7 +148,6 @@ class Parser:
 
         return return_statement
 
-
     def _parse_statement(self) -> Optional[Statement]:
         assert self._current_token is not None
         if self._current_token.token_type == TokenType.LET:
@@ -115,14 +155,15 @@ class Parser:
         elif self._current_token.token_type == TokenType.RETURN:
             return self._parse_return_statement()
         else:
-            return None
-    
+            return self._parse_expression_statement()
+
     def _register_infix_fns(self) -> InfixParseFns:
         return {}
-    
-    def _register_prefix_fns(self) -> PrefixParseFns:
-        return {}
 
+    def _register_prefix_fns(self) -> PrefixParseFns:
+        return {
+            TokenType.IDENT: self._parse_identifier,
+        }
 '''
     Parsing function order:
     1. _parse_statement: Valida que el primer token sea un  'variable'm si es asi, lo envia al metodo _parse_let_statement 

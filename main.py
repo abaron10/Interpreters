@@ -27,11 +27,7 @@ def main():
 
 
 #     start_repl()       
-    source: str = '''
-            variable x = 5;
-            variable y = 10;
-            variable foo = 20;
-        '''
+    source: str = 'foobar;'
     lexer: Lexer = Lexer(source)
     parser: Parser = Parser(lexer)
 
